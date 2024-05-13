@@ -53,7 +53,9 @@ const Chain = ({
 }) => (
   <Chip
     variant="soft"
-    color={`${chains.find((c) => (source ? selectedChain === c.id : selectedChain !== c.id))?.color}`}
+    color={
+      `${chains.find((c) => (source ? selectedChain === c.id : selectedChain !== c.id))?.color}` as any
+    }
     sx={{ width: 150 }}
   >
     {
