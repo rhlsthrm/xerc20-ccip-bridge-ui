@@ -74,8 +74,9 @@ export const BridgeUI = () => {
   const { data: client } = useWalletClient();
   const publicClient = usePublicClient();
   const [amount, setAmount] = useState("0");
-  const [bridging, setBridging] = useState(true);
+  const [bridging, setBridging] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [txHash, setTxHash] = useState<string>();
   const { data: allowance, refetch: refetchAllowance } =
     useReadFlokiForkAllowance({
       args: client?.account?.address
@@ -114,8 +115,6 @@ export const BridgeUI = () => {
   if (!balance) {
     balance = 0n;
   }
-  console.log("fee: ", fee);
-  console.log("allowance: ", allowance);
 
   useEffect(() => {
     if (chainId !== selectedChain) {
@@ -127,16 +126,26 @@ export const BridgeUI = () => {
   }, [chainId, selectedChain, switchChain]);
 
   const handleBridge = async () => {
-    const tx = await bridgeTokens({
-      args: [
-        xerc20Address[selectedChain],
-        destinationChain,
-        client!.account!.address,
-        parseEther(amount),
-      ],
-      value: fee,
-    });
-    console.log("tx: ", tx);
+    setBridging(true);
+    try {
+      const tx = await bridgeTokens({
+        args: [
+          xerc20Address[selectedChain],
+          destinationChain,
+          client!.account!.address,
+          parseEther(amount),
+        ],
+        value: fee,
+      });
+      console.log("tx: ", tx);
+      const res = await publicClient?.waitForTransactionReceipt({ hash: tx });
+      console.log("res: ", res);
+      setTxHash(tx);
+    } catch (e) {
+      console.error(e);
+      setTxHash(undefined);
+    }
+    setBridging(false);
   };
 
   const handleApprove = async () => {
@@ -157,8 +166,8 @@ export const BridgeUI = () => {
 
   return (
     <Card size="lg">
-      {bridging ? (
-        <BridgeProgress hash="0xabc" setBridging={setBridging} />
+      {txHash ? (
+        <BridgeProgress hash={txHash} setTxHash={setTxHash} />
       ) : (
         <>
           <CardContent>
@@ -229,7 +238,12 @@ export const BridgeUI = () => {
                 Approve
               </Button>
             ) : (
-              <Button variant="solid" color="primary" onClick={handleBridge}>
+              <Button
+                variant="solid"
+                color="primary"
+                onClick={handleBridge}
+                loading={bridging}
+              >
                 Bridge
               </Button>
             )}
@@ -242,10 +256,10 @@ export const BridgeUI = () => {
 
 const BridgeProgress = ({
   hash,
-  setBridging,
+  setTxHash,
 }: {
   hash: string;
-  setBridging: Dispatch<SetStateAction<boolean>>;
+  setTxHash: Dispatch<SetStateAction<string | undefined>>;
 }) => {
   return (
     <CardContent>
@@ -262,7 +276,7 @@ const BridgeProgress = ({
         Your tokens are bridging! Bridging could take up to 15 minutes, <br />
         use the following link to follow the progress.
       </Typography>
-      <a href="https://etherscan.io/" target="_blank" rel="noreferrer">
+      <a href="https://ccip.chain.link/" target="_blank" rel="noreferrer">
         CCIP Explorer
       </a>
       <Typography level="body-sm" paddingTop={2}>
@@ -275,7 +289,7 @@ const BridgeProgress = ({
         <Button
           variant="solid"
           color="primary"
-          onClick={() => setBridging(false)}
+          onClick={() => setTxHash(undefined)}
         >
           Back
         </Button>
